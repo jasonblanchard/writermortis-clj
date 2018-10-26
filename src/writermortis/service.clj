@@ -2,6 +2,7 @@
   (:require [io.pedestal.http :as http]
             [io.pedestal.http.route :as route]
             [io.pedestal.http.body-params :as body-params]
+            [io.pedestal.http.ring-middlewares :as middlewares]
             [ring.util.response :as ring-resp]))
 
 (defn about-page
@@ -26,17 +27,22 @@
      ;; TODO: Get the user by username and check password first
      (assoc context :current-user {:id 1}))})
 
+(def set-access-token
+  {:name :set-access-token
+   :leave
+   (fn [context] (assoc-in context [:response :cookies] {"access_token" {:value "aaa.bbb.ccc"}}))})
+
 (def login-render
   {:name :login-render
    :leave
    (fn [context]
-     ;; Set cookie at some point
-     (let [body (http/json-response (:current-user context))]
-       (assoc context :response body)))})
+     (let [json-response (http/json-response (:current-user context))]
+       ;; TODO: There's gotta be a better way to do this...
+       (assoc context :response (merge json-response (:response context)))))})
 
 (def routes #{["/"        :get (conj common-interceptors `home-page)]
               ["/about"   :get (conj common-interceptors `about-page)]
-              ["/login"   :post [login-render login]]})
+              ["/login"   :post [login-render middlewares/cookies set-access-token login]]})
 
 ;; Consumed by writermortis.server/create-server
 ;; See http/default-interceptors for additional options you can configure
@@ -71,7 +77,7 @@
               ;;  This can also be your own chain provider/server-fn -- http://pedestal.io/reference/architecture-overview#_chain_provider
               ::http/type :jetty
               ;;::http/host "localhost"
-              ::http/port 8080
+              ::http/port 8085
               ;; Options to pass to the container (Jetty)
               ::http/container-options {:h2c? true
                                         :h2? false
