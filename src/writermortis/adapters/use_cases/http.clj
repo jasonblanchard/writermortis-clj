@@ -43,8 +43,7 @@
      (if (:access-token context)
        (assoc-in context [:response :cookies]
                  {"access-token" {:value (:access-token context)}})
-       (assoc-in context [:response :cookies]
-                 (get-in context [:request :cookies]))))})
+       context))})
 
 (def login-render
   {:name :login-render
