@@ -21,30 +21,42 @@
   {:name :validate-password
    :enter
    (fn [context]
-     (if-let [current-user (auth/verify-password (:authenticating-user context) (get-in context [:request :json-params :password]))]
-       (assoc context :current-user (:authenticating-user context))
+     (let
+      [password         (get-in context [:request :json-params :password])
+       user-record      (:authenticating-user context)
+       did-authenticate (auth/verify-password  user-record password)]
+       (if did-authenticate
+         (assoc context :current-user (:authenticating-user context))
          ;; TODO: json stringify response
-       (assoc context :response {:status 401 :body "Not Authorized"})))})
+         (assoc context :response {:status 401 :body "Not Authorized"}))))})
 
 (def access-token
   {:name :access-token
    :enter
    (fn [context]
-     (assoc context :access-token "aaa.bbb.ccc"))})
+     (assoc context :access-token (get-in context [:current-user :id])))})
 
 (def set-access-token-cookie
   {:name :set-access-token-cookie
    :leave
-     ;; TODO: Only if the user successfull auth'd
-   (fn [context] (assoc-in context [:response :cookies] {"access-token" {:value (:access-token context)}}))})
+   (fn [context]
+     (if (:access-token context)
+       (assoc-in context [:response :cookies]
+                 {"access-token" {:value (:access-token context)}})
+       (assoc-in context [:response :cookies]
+                 (get-in context [:request :cookies]))))})
 
 (def login-render
   {:name :login-render
    :leave
    (fn [context]
-     (let [json-response (http/json-response (user-mapper/map-record (:current-user context)))]
+     (let
+      [json-response
+       (http/json-response (user-mapper/map-record (:current-user context)))]
          ;; TODO: There's gotta be a better way to do this...
        (assoc context :response (merge json-response (:response context)))))})
+
+;; debugger
 
 (def context-to-body
   {:name :context-to-body
